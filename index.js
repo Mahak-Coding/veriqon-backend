@@ -5,6 +5,13 @@ const crypto = require('crypto');
 
 app.use(express.json());
 
+// CORS fix
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
+
 // Health check
 app.get('/', (req, res) => {
   res.json({ status: 'Veriqon backend is running!' });
