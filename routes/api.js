@@ -31,4 +31,44 @@ router.get('/orders', async (req, res) => {
   res.json(data || []);
 });
 
+// Customers list — orders se unique customers
+router.get('/customers', async (req, res) => {
+  const shop = req.query.shop || 'nbtsd.myshopify.com';
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('customer_email, customer_id, is_new_customer, risk_level, risk_score, is_blocked, total_price, flags')
+    .eq('shop_domain', shop)
+    .order('risk_score', { ascending: false });
+
+  if (error) return res.status(500).json({ error });
+
+  // Unique customers by email
+  const customerMap = {};
+  data.forEach(order => {
+    const email = order.customer_email || 'unknown';
+    if (!customerMap[email]) {
+      customerMap[email] = {
+        email,
+        total_orders: 0,
+        total_spent: 0,
+        risk_level: order.risk_level,
+        risk_score: order.risk_score,
+        is_blocked: order.is_blocked,
+        is_new_customer: order.is_new_customer,
+        flags: order.flags || []
+      };
+    }
+    customerMap[email].total_orders += 1;
+    customerMap[email].total_spent += Number(order.total_price) || 0;
+    // Highest risk level rakho
+    if (order.risk_score > customerMap[email].risk_score) {
+      customerMap[email].risk_score = order.risk_score;
+      customerMap[email].risk_level = order.risk_level;
+    }
+  });
+
+  res.json(Object.values(customerMap));
+});
+
 module.exports = router;
