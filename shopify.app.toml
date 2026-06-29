@@ -1,0 +1,24 @@
+client_id = "1142125ad6fe7b720645ca301f8c89cd"
+name = "Veriqon"
+application_url = "https://veriqon-backend.onrender.com"
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  topics = ["orders/create"]
+  uri = "/webhook/orders/create"
+
+  [[webhooks.subscriptions]]
+  topics = ["orders/updated"]
+  uri = "/webhook/orders/updated"
+
+[access_scopes]
+scopes = "read_orders,write_orders,read_customers"
+
+[auth]
+redirect_urls = ["https://veriqon-backend.onrender.com/auth/callback"]

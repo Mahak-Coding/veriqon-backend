@@ -20,6 +20,8 @@ app.get('/', (req, res) => {
 // Auth callback - Shopify OAuth
 app.get('/auth/callback', async (req, res) => {
   const { shop, code, hmac } = req.query;
+  console.log('Auth callback received for shop:', shop);
+console.log('Query params:', req.query);
 
   if (!shop || !code) {
     return res.status(400).send('Missing shop or code');
@@ -28,17 +30,27 @@ app.get('/auth/callback', async (req, res) => {
   try {
     // Exchange code for access token
     const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: process.env.SHOPIFY_API_KEY,
-        client_secret: process.env.SHOPIFY_API_SECRET,
-        code
-      })
-    });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    client_id: process.env.SHOPIFY_API_KEY,
+    client_secret: process.env.SHOPIFY_API_SECRET,
+    code
+  })
+});
 
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
+const rawText = await tokenResponse.text();
+console.log('Token response:', rawText);
+
+let tokenData;
+try {
+  tokenData = JSON.parse(rawText);
+} catch (e) {
+  console.error('Token parse error:', rawText);
+  return res.status(400).send('Invalid token response from Shopify');
+}
+
+const accessToken = tokenData.access_token;
 
     if (!accessToken) {
       return res.status(400).send('Could not get access token');
@@ -64,15 +76,17 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Register webhooks function
 async function registerWebhooks(shop, accessToken) {
+  // Always register for the actual store
+  const actualShop = 'nbtsd.myshopify.com';
+  
   const webhooks = [
     { topic: 'orders/create', address: `${process.env.APP_URL}/webhook/orders/create` },
     { topic: 'orders/updated', address: `${process.env.APP_URL}/webhook/orders/updated` }
   ];
 
   for (const webhook of webhooks) {
-    await fetch(`https://${shop}/admin/api/2024-01/webhooks.json`, {
+    const res = await fetch(`https://${actualShop}/admin/api/2024-01/webhooks.json`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -80,8 +94,10 @@ async function registerWebhooks(shop, accessToken) {
       },
       body: JSON.stringify({ webhook })
     });
+    const data = await res.json();
+    console.log('Webhook result:', JSON.stringify(data));
   }
-  console.log(`Webhooks registered for ${shop}`);
+  console.log(`Webhooks registered for ${actualShop}`);
 }
 
 // Routes

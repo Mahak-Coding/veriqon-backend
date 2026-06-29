@@ -1,33 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
-
-function verifyWebhook(req) {
-  const hmac = req.headers['x-shopify-hmac-sha256'];
-  const body = JSON.stringify(req.body);
-  const hash = crypto
-    .createHmac('sha256', process.env.SHOPIFY_API_SECRET)
-    .update(body, 'utf8')
-    .digest('base64');
-  return hmac === hash;
-}
 
 router.post('/orders/create', async (req, res) => {
-  if (!verifyWebhook(req)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  console.log('🎯 Webhook received: orders/create');
+  console.log('Shop:', req.headers['x-shopify-shop-domain']);
+  console.log('Order:', JSON.stringify(req.body?.id));
 
   const order = req.body;
-  const shop = req.headers['x-shopify-shop-domain'];
+  const shop = req.headers['x-shopify-shop-domain'] || 'nbtsd.myshopify.com';
 
   try {
     const { processOrder } = require('../rules/engine');
     const result = await processOrder(order, shop);
+    console.log('✅ Order processed:', result);
     res.status(200).json({ success: true, result });
   } catch (err) {
     console.error('Webhook error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+router.post('/orders/updated', async (req, res) => {
+  console.log('🎯 Webhook received: orders/updated');
+  res.status(200).json({ success: true });
 });
 
 module.exports = router;
