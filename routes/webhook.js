@@ -3,13 +3,25 @@ const router = express.Router();
 
 router.post('/orders/create', async (req, res) => {
   console.log('🎯 Webhook received: orders/create');
-  console.log('Shop:', req.headers['x-shopify-shop-domain']);
-  console.log('Order:', JSON.stringify(req.body?.id));
-
+  
   const order = req.body;
-  const shop = req.headers['x-shopify-shop-domain'] || 'nbtsd.myshopify.com';
+  // Always use nbtsd store
+  const shop = 'nbtsd.myshopify.com';
 
   try {
+    // Duplicate check
+    const supabase = require('../db/supabase');
+    const { data: existing } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('shopify_order_id', String(order.id))
+      .single();
+
+    if (existing) {
+      console.log('Duplicate order — skipping');
+      return res.status(200).json({ success: true, message: 'duplicate' });
+    }
+
     const { processOrder } = require('../rules/engine');
     const result = await processOrder(order, shop);
     console.log('✅ Order processed:', result);
