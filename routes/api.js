@@ -71,4 +71,49 @@ router.get('/customers', async (req, res) => {
   res.json(Object.values(customerMap));
 });
 
+// Single order detail
+router.get('/orders/:id', async (req, res) => {
+  const { id } = req.params;
+  const shop = req.query.shop || 'nbtsd.myshopify.com';
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', id)
+    .eq('shop_domain', shop)
+    .single();
+
+  if (error) return res.status(404).json({ error: 'Order not found' });
+  res.json(data);
+});
+
+// Block/Unblock order
+router.post('/orders/:id/block', async (req, res) => {
+  const { id } = req.params;
+  
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ is_blocked: true })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error });
+  res.json({ success: true, data });
+});
+
+router.post('/orders/:id/unblock', async (req, res) => {
+  const { id } = req.params;
+  
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ is_blocked: false })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error });
+  res.json({ success: true, data });
+});
+
 module.exports = router;
