@@ -15,6 +15,39 @@ async function processOrder(order, shop) {
   const mediumThreshold = merchant?.medium_risk_threshold ?? 40;
   const autoBlockEnabled = merchant?.auto_block ?? true;
 
+  // Check blocklist
+  const { data: blocklist } = await supabase
+    .from('blocklist')
+    .select('type, value')
+    .eq('shop_domain', shop);
+
+  let blocklistMatch = null;
+  if (blocklist && blocklist.length > 0) {
+    const customerEmail = order.email?.toLowerCase().trim();
+    const emailDomain = customerEmail?.split('@')[1];
+    const ip = order.browser_ip;
+    const country = order.shipping_address?.country;
+
+    for (const item of blocklist) {
+      if (item.type === 'email' && item.value === customerEmail) {
+        blocklistMatch = `Blocklisted email: ${customerEmail}`;
+        break;
+      }
+      if (item.type === 'domain' && item.value === emailDomain) {
+        blocklistMatch = `Blocklisted email domain: ${emailDomain}`;
+        break;
+      }
+      if (item.type === 'ip' && item.value === ip) {
+        blocklistMatch = `Blocklisted IP: ${ip}`;
+        break;
+      }
+      if (item.type === 'country' && country && item.value === country.toLowerCase()) {
+        blocklistMatch = `Blocklisted country: ${country}`;
+        break;
+      }
+    }
+  }
+
   const billing = order.billing_address;
   const shipping = order.shipping_address;
   const billingEqShipping = billing?.city === shipping?.city &&
@@ -85,6 +118,12 @@ async function processOrder(order, shop) {
     riskScore += 15;
   }
 
+// Blocklist override — instant high risk + auto block
+  if (blocklistMatch) {
+    flags.push('blocklist_match');
+    riskScore = 100;
+  }
+
   // Cap score at 100
   if (riskScore > 100) riskScore = 100;
 
@@ -92,7 +131,7 @@ async function processOrder(order, shop) {
   if (riskScore >= highThreshold) riskLevel = 'high';
   else if (riskScore >= mediumThreshold) riskLevel = 'medium';
 
-  const isBlocked = autoBlockEnabled && riskScore >= highThreshold;
+ const isBlocked = (autoBlockEnabled && riskScore >= highThreshold) || !!blocklistMatch;
 
   const { data, error } = await supabase.from('orders').insert([{
     shopify_order_id: String(order.id),
