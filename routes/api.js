@@ -116,4 +116,41 @@ router.post('/orders/:id/unblock', async (req, res) => {
   res.json({ success: true, data });
 });
 
+// Get merchant settings
+router.get('/settings', async (req, res) => {
+  const shop = req.query.shop || 'nbtsd.myshopify.com';
+
+  const { data, error } = await supabase
+    .from('merchant_settings')
+    .select('*')
+    .eq('shop_domain', shop)
+    .single();
+
+  if (error) return res.status(404).json({ error: 'Settings not found' });
+  res.json(data);
+});
+
+// Update merchant settings
+router.post('/settings', async (req, res) => {
+  const { shop, high_risk_threshold, medium_risk_threshold, auto_block, alert_email } = req.body;
+
+  if (!shop) return res.status(400).json({ error: 'Shop is required' });
+
+  const updateData = { updated_at: new Date().toISOString() };
+  if (high_risk_threshold !== undefined) updateData.high_risk_threshold = high_risk_threshold;
+  if (medium_risk_threshold !== undefined) updateData.medium_risk_threshold = medium_risk_threshold;
+  if (auto_block !== undefined) updateData.auto_block = auto_block;
+  if (alert_email !== undefined) updateData.alert_email = alert_email;
+
+  const { data, error } = await supabase
+    .from('merchant_settings')
+    .update(updateData)
+    .eq('shop_domain', shop)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error });
+  res.json({ success: true, data });
+});
+
 module.exports = router;
