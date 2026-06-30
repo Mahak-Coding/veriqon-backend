@@ -153,4 +153,64 @@ router.post('/settings', async (req, res) => {
   res.json({ success: true, data });
 });
 
+// Get blocklist
+router.get('/blocklist', async (req, res) => {
+  const shop = req.query.shop || 'nbtsd.myshopify.com';
+
+  const { data, error } = await supabase
+    .from('blocklist')
+    .select('*')
+    .eq('shop_domain', shop)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error });
+  res.json(data);
+});
+
+// Add to blocklist
+router.post('/blocklist', async (req, res) => {
+  const { shop, type, value, reason } = req.body;
+
+  if (!shop || !type || !value) {
+    return res.status(400).json({ error: 'shop, type, and value are required' });
+  }
+
+  const validTypes = ['email', 'domain', 'country', 'ip'];
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ error: 'type must be one of: email, domain, country, ip' });
+  }
+
+  const { data, error } = await supabase
+    .from('blocklist')
+    .insert([{
+      shop_domain: shop,
+      type,
+      value: value.toLowerCase().trim(),
+      reason: reason || null
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'This item is already blocklisted' });
+    }
+    return res.status(500).json({ error });
+  }
+  res.json({ success: true, data });
+});
+
+// Remove from blocklist
+router.delete('/blocklist/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from('blocklist')
+    .delete()
+    .eq('id', id);
+
+  if (error) return res.status(500).json({ error });
+  res.json({ success: true });
+});
+
 module.exports = router;
