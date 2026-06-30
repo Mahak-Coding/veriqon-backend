@@ -2,19 +2,25 @@ const express = require('express');
 const router = express.Router();
 
 router.post('/orders/create', async (req, res) => {
-  console.log('🎯 Webhook received: orders/create');
-  
   const order = req.body;
-  // Always use nbtsd store
-  const shop = 'nbtsd.myshopify.com';
+  const shop = req.headers['x-shopify-shop-domain'];
+
+  console.log(`🎯 Webhook received: orders/create from ${shop}`);
+
+  if (!shop) {
+    console.error('No shop domain in webhook headers');
+    return res.status(400).json({ error: 'Missing shop domain' });
+  }
 
   try {
-    // Duplicate check
     const supabase = require('../db/supabase');
+
+    // Duplicate check
     const { data: existing } = await supabase
       .from('orders')
       .select('id')
       .eq('shopify_order_id', String(order.id))
+      .eq('shop_domain', shop)
       .single();
 
     if (existing) {
@@ -33,7 +39,8 @@ router.post('/orders/create', async (req, res) => {
 });
 
 router.post('/orders/updated', async (req, res) => {
-  console.log('🎯 Webhook received: orders/updated');
+  const shop = req.headers['x-shopify-shop-domain'];
+  console.log(`🎯 Webhook received: orders/updated from ${shop}`);
   res.status(200).json({ success: true });
 });
 

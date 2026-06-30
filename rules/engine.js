@@ -4,6 +4,17 @@ async function processOrder(order, shop) {
   const flags = [];
   let riskScore = 0;
 
+  // Get merchant's custom thresholds
+  const { data: merchant } = await supabase
+    .from('merchant_settings')
+    .select('high_risk_threshold, medium_risk_threshold, auto_block')
+    .eq('shop_domain', shop)
+    .single();
+
+  const highThreshold = merchant?.high_risk_threshold ?? 70;
+  const mediumThreshold = merchant?.medium_risk_threshold ?? 40;
+  const autoBlockEnabled = merchant?.auto_block ?? true;
+
   const billing = order.billing_address;
   const shipping = order.shipping_address;
   const billingEqShipping = billing?.city === shipping?.city &&
@@ -78,10 +89,10 @@ async function processOrder(order, shop) {
   if (riskScore > 100) riskScore = 100;
 
   let riskLevel = 'low';
-  if (riskScore >= 50) riskLevel = 'high';
-  else if (riskScore >= 25) riskLevel = 'medium';
+  if (riskScore >= highThreshold) riskLevel = 'high';
+  else if (riskScore >= mediumThreshold) riskLevel = 'medium';
 
-  const isBlocked = riskScore >= 70;
+  const isBlocked = autoBlockEnabled && riskScore >= highThreshold;
 
   const { data, error } = await supabase.from('orders').insert([{
     shopify_order_id: String(order.id),
